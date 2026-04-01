@@ -1,0 +1,21 @@
+[package]
+name = "cuda-texture-transfer"
+version = "0.1.0"
+edition = "2021"
+publish = true
+license = "MIT"
+
+[dependencies]
+anyhow = "1"
+cuda-sys = "0.2"
+gl = "0.14"
+
+[dev-dependencies]
+glium = "0.36"
+glutin = "0.32.2"
+#tonari-gl = { path = "../tonari-gl" }
+
+[[test]]
+name = "transfer-test"
+path = "tests/transfer_test.rs"
+harness = false
