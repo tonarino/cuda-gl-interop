@@ -433,8 +433,14 @@ extern "C" {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Size {
-    width: f32,
-    height: f32,
+    pub width: u32,
+    pub height: u32,
+}
+
+impl Size {
+    pub fn num_pixels(self) -> usize {
+        self.width as usize * self.height as usize
+    }
 }
 
 impl fmt::Display for Size {

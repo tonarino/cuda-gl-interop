@@ -1,5 +1,5 @@
 use anyhow::Result;
-use cuda_texture_transfer::{CudaBuffer, TextureReceiver, TextureSender};
+use cuda_texture_transfer::{CudaBuffer, Size, TextureReceiver, TextureSender};
 use glium::{
     backend::Facade,
     texture::{ClientFormat, MipmapsOption, RawImage2d, UncompressedFloatFormat},
@@ -7,10 +7,12 @@ use glium::{
 };
 use std::borrow::Cow;
 use tonari_gl::HeadlessGlContext;
-use tonari_math::Size;
 
 fn main() -> Result<()> {
-    let size = Size { width: 640, height: 480 };
+    let size = Size {
+        width: 640,
+        height: 480,
+    };
 
     let (context, event_loop) = HeadlessGlContext::new_root_context::<()>(size).unwrap();
     let context = context.into_not_current();
