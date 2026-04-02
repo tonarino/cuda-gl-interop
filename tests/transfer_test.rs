@@ -1,12 +1,12 @@
 use anyhow::Result;
-use cuda_texture_transfer::{CudaBuffer, Size, TextureReceiver, TextureSender};
+use cuda_gl_interop::{CudaBuffer, Size, TextureReceiver, TextureSender};
 use glium::{
-    backend::Facade,
+    backend::{glutin::SimpleWindowBuilder, Facade},
     texture::{ClientFormat, MipmapsOption, RawImage2d, UncompressedFloatFormat},
     GlObject, Texture2d,
 };
 use std::borrow::Cow;
-use tonari_gl::HeadlessGlContext;
+use winit::event_loop::EventLoop;
 
 fn main() -> Result<()> {
     let size = Size {
@@ -14,48 +14,30 @@ fn main() -> Result<()> {
         height: 480,
     };
 
-    let (context, event_loop) = HeadlessGlContext::new_root_context::<()>(size).unwrap();
-    let context = context.into_not_current();
-
-    let headless = context
-        .create_headless_shared_context_for_textures_only(&event_loop)
-        .into_current()
-        .unwrap()
-        .into_glium_context();
+    let event_loop = EventLoop::builder().build().unwrap();
+    let (_window, display) = SimpleWindowBuilder::new().build(&event_loop);
 
     let original_texture_data = vec![128u8; size.num_pixels() * 4];
-
-    let gl_texture = create_texture(&headless, &original_texture_data, size)?;
+    let original_texture = create_texture(&display, &original_texture_data, size)?;
 
     let mut cuda_buffer = CudaBuffer::new(size)?;
 
     let mut texture_sender = TextureSender::new();
-    texture_sender.copy_texture_to_cuda_buffer(gl_texture.get_id(), size, &mut cuda_buffer)?;
+    texture_sender.copy_texture_to_cuda_buffer(
+        original_texture.get_id(),
+        size,
+        &mut cuda_buffer,
+    )?;
 
-    let thread_gl_context = context.create_headless_shared_context_for_textures_only(&event_loop);
+    let black_texture_data = vec![0u8; size.num_pixels() * 4];
+    let copied_texture = create_texture(&display, &black_texture_data, size).unwrap();
 
-    let thread_handle = std::thread::spawn(move || -> Result<_> {
-        let thread_gl_context = thread_gl_context.into_current().unwrap();
-        let headless_thread_gl_context = thread_gl_context.into_glium_context();
+    let mut texture_receiver = TextureReceiver::new();
+    texture_receiver.copy_cuda_buffer_to_texture(&cuda_buffer, copied_texture.get_id(), size)?;
 
-        let black_texture_data = vec![0u8; size.num_pixels() * 4];
-        let thread_gl_texture =
-            create_texture(&headless_thread_gl_context, &black_texture_data, size).unwrap();
+    let copied_texture_data: Vec<Vec<(u8, u8, u8, u8)>> = copied_texture.read();
 
-        let mut texture_receiver = TextureReceiver::new();
-        texture_receiver.copy_cuda_buffer_to_texture(
-            &cuda_buffer,
-            thread_gl_texture.get_id(),
-            size,
-        )?;
-
-        let texture_data: Vec<Vec<(u8, u8, u8, u8)>> = thread_gl_texture.read();
-        Ok(texture_data)
-    });
-
-    let result = thread_handle.join().unwrap()?;
-
-    let transferred_data: Vec<u8> = result
+    let transferred_data: Vec<u8> = copied_texture_data
         .into_iter()
         .flat_map(|pixel| pixel.into_iter().flat_map(|(r, g, b, a)| [r, g, b, a]))
         .collect();
