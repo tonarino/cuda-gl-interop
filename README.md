@@ -1,1 +1,1 @@
-# cuda-texture-transfer
+# cuda-gl-interop

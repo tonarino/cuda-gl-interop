@@ -1,5 +1,5 @@
 [package]
-name = "cuda-texture-transfer"
+name = "cuda-gl-interop"
 version = "0.1.0"
 edition = "2021"
 publish = true
