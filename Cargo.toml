@@ -1,9 +1,14 @@
 [package]
 name = "cuda-gl-interop"
+description = "Crate for copying memory between CUDA buffers and OpenGL textures."
 version = "0.1.0"
-edition = "2021"
-publish = true
+authors = ["Brian Schwind <brianmschwind@gmail.com>", "Matěj Laitl <matej@laitl.cz>", "Marek Bernat <marek.bernat@gmail.com>"]
 license = "MIT"
+edition = "2021"
+repository = "https://github.com/tonarino/cuda-gl-interop"
+homepage = "https://github.com/tonarino/cuda-gl-interop"
+readme = "README.md"
+keywords = ["cuda", "opengl"]
 
 [dependencies]
 anyhow = "1"
