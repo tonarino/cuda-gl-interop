@@ -296,7 +296,7 @@ impl TextureSender {
     ///
     /// # Errors
     ///
-    /// Will return `Err` if `cuda_buffer` was allocated with different `width` or `height`.
+    /// Will return `Err` if `cuda_slice` was allocated with different `width` or `height`.
     /// Should also fail if `texture_id` does not identify an appropriate texture, but no guarantee.
     pub fn copy_texture_to_cuda_slice(
         &mut self,
@@ -306,7 +306,7 @@ impl TextureSender {
     ) -> Result<()> {
         if size != cuda_slice.size() {
             bail!(
-                "Passed size {size} differs from cuda_buffer size {}.",
+                "Passed size {size} differs from cuda_slice size {}.",
                 cuda_slice.size()
             );
         }
@@ -442,7 +442,7 @@ impl TextureReceiver {
     ///
     /// # Errors
     ///
-    /// Will return `Err` if `cuda_buffer` was allocated with different `width` or `height`.
+    /// Will return `Err` if `cuda_slice` was allocated with different `width` or `height`.
     /// Should also fail if `texture_id` does not identify an appropriate texture, but no guarantee.
     pub fn copy_cuda_slice_to_texture(
         &mut self,
@@ -452,7 +452,7 @@ impl TextureReceiver {
     ) -> Result<()> {
         if size != cuda_slice.size() {
             bail!(
-                "Passed size {size} differs from cuda_buffer size {}.",
+                "Passed size {size} differs from cuda_slice size {}.",
                 cuda_slice.size()
             );
         }
