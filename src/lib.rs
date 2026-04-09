@@ -4,6 +4,7 @@ use std::{
     collections::{hash_map::Entry, HashMap},
     ffi::c_void,
     fmt::{self},
+    marker::PhantomData,
     mem::MaybeUninit,
 };
 //use tonari_math::Size;
@@ -156,6 +157,24 @@ impl CudaBuffer {
         })
     }
 
+    pub fn as_slice<'a>(&'a self) -> CudaSlice<'a> {
+        // SAFETY: `self` is a CUDA device buffer valid for lifetime `'a`.
+        unsafe { CudaSlice::new(self.buffer, self.pitch, self.size) }
+    }
+
+    pub fn as_slice_mut<'a>(&'a mut self) -> CudaSliceMut<'a> {
+        // SAFETY: `self` is a CUDA device buffer valid for lifetime `'a`.
+        unsafe { CudaSliceMut::new(self.buffer, self.pitch, self.size) }
+    }
+
+    pub fn ptr(&self) -> CudaBufferPtr {
+        self.buffer
+    }
+
+    pub fn pitch(&self) -> usize {
+        self.pitch
+    }
+
     pub fn size(&self) -> Size {
         self.size
     }
@@ -171,6 +190,60 @@ impl Drop for CudaBuffer {
                 .to_result()
                 .expect("freeing a valid CUDA pointer should not fail");
         }
+    }
+}
+
+/// A slice of a CUDA device buffer.
+pub struct CudaSlice<'a> {
+    buffer: CudaBufferPtr,
+    pitch: usize,
+    size: Size,
+    _phantom_data: PhantomData<&'a CudaBuffer>,
+}
+
+impl<'a> CudaSlice<'a> {
+    /// # Safety
+    ///
+    /// The input data must represent a valid CUDA buffer, such as the one obtained
+    /// with `CudaBuffer::new()`, and it must remain valid for the lifetime of `'a`.
+    pub unsafe fn new(buffer: CudaBufferPtr, pitch: usize, size: Size) -> Self {
+        Self {
+            buffer,
+            pitch,
+            size,
+            _phantom_data: PhantomData,
+        }
+    }
+
+    pub fn size(&self) -> Size {
+        self.size
+    }
+}
+
+/// A slice of a CUDA device buffer.
+pub struct CudaSliceMut<'a> {
+    buffer: CudaBufferPtr,
+    pitch: usize,
+    size: Size,
+    _phantom_data: PhantomData<&'a mut CudaBuffer>,
+}
+
+impl<'a> CudaSliceMut<'a> {
+    /// # Safety
+    ///
+    /// The input data must represent a valid CUDA buffer, such as the one obtained
+    /// with `CudaBuffer::new()`, and it must remain valid for the lifetime of `'a`.
+    pub unsafe fn new(buffer: CudaBufferPtr, pitch: usize, size: Size) -> Self {
+        Self {
+            buffer,
+            pitch,
+            size,
+            _phantom_data: PhantomData,
+        }
+    }
+
+    pub fn size(&self) -> Size {
+        self.size
     }
 }
 
@@ -211,10 +284,30 @@ impl TextureSender {
         size: Size,
         cuda_buffer: &mut CudaBuffer,
     ) -> Result<()> {
-        if size != cuda_buffer.size() {
+        self.copy_texture_to_cuda_slice(texture_id, size, cuda_buffer.as_slice_mut())
+    }
+
+    /// Copies an OpenGL texture, which must be in RGBA8 format, to a CUDA slice.
+    ///
+    /// This method is asynchronous (does not block the CPU until the transfer is done) from host
+    /// PoV, it provides guarantees that any OpenGL operations on the texture submitted _before_
+    /// this call finish before the copy, and all OpenGL operations submitted _after_ only start
+    /// after the copy is finished.
+    ///
+    /// # Errors
+    ///
+    /// Will return `Err` if `cuda_buffer` was allocated with different `width` or `height`.
+    /// Should also fail if `texture_id` does not identify an appropriate texture, but no guarantee.
+    pub fn copy_texture_to_cuda_slice(
+        &mut self,
+        texture_id: u32,
+        size: Size,
+        cuda_slice: CudaSliceMut<'_>,
+    ) -> Result<()> {
+        if size != cuda_slice.size() {
             bail!(
                 "Passed size {size} differs from cuda_buffer size {}.",
-                cuda_buffer.size()
+                cuda_slice.size()
             );
         }
 
@@ -274,8 +367,8 @@ impl TextureSender {
         // should not interact with host memory (thus Rust memory safety) anyway.
         unsafe {
             cudart::cudaMemcpy2DFromArray(
-                cuda_buffer.buffer,                          // dst
-                cuda_buffer.pitch,                           // dst pitch
+                cuda_slice.buffer,                           // dst
+                cuda_slice.pitch,                            // dst pitch
                 array,                                       // src
                 0,                                           // width offset
                 0,                                           // height offset
@@ -337,10 +430,30 @@ impl TextureReceiver {
         texture_id: u32,
         size: Size,
     ) -> Result<()> {
-        if size != cuda_buffer.size() {
+        self.copy_cuda_slice_to_texture(cuda_buffer.as_slice(), texture_id, size)
+    }
+
+    /// Copies a CUDA slice to an OpenGL texture, which must be in RGBA8 format.
+    ///
+    /// This method is asynchronous (does not block the CPU until the transfer is done) from host
+    /// PoV, it provides guarantees that any OpenGL operations on the texture submitted _before_
+    /// this call finish before the copy, and all OpenGL operations submitted _after_ only start
+    /// after the copy is finished.
+    ///
+    /// # Errors
+    ///
+    /// Will return `Err` if `cuda_buffer` was allocated with different `width` or `height`.
+    /// Should also fail if `texture_id` does not identify an appropriate texture, but no guarantee.
+    pub fn copy_cuda_slice_to_texture(
+        &mut self,
+        cuda_slice: CudaSlice<'_>,
+        texture_id: u32,
+        size: Size,
+    ) -> Result<()> {
+        if size != cuda_slice.size() {
             bail!(
                 "Passed size {size} differs from cuda_buffer size {}.",
-                cuda_buffer.size()
+                cuda_slice.size()
             );
         }
 
@@ -385,8 +498,8 @@ impl TextureReceiver {
                 array,                                       // dst
                 0,                                           // width offset
                 0,                                           // height offset
-                cuda_buffer.buffer,                          // src
-                cuda_buffer.pitch,                           // src pitch
+                cuda_slice.buffer,                           // src
+                cuda_slice.pitch,                            // src pitch
                 size.width as usize * BYTES_PER_RGBA8_PIXEL, // width in bytes
                 size.height as usize,                        // height in rows
                 CUDA_MEMCPY_DEVICE_TO_DEVICE,                // memcpy kind
