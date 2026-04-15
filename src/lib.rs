@@ -1,13 +1,12 @@
 use anyhow::{anyhow, bail, Result};
 use cuda_sys::cudart;
+use euclid::default::Size2D;
 use std::{
     collections::{hash_map::Entry, HashMap},
     ffi::c_void,
-    fmt::{self},
     marker::PhantomData,
     mem::MaybeUninit,
 };
-//use tonari_math::Size;
 
 const CUDA_GRAPHICS_REGISTER_FLAGS_NONE: u32 = 0;
 const CUDA_GRAPHICS_REGISTER_FLAGS_READ_ONLY: u32 = 1;
@@ -18,6 +17,8 @@ const CUDA_MEMCPY_DEVICE_TO_DEVICE: u32 = 3;
 const BYTES_PER_RGBA8_PIXEL: usize = 4;
 
 type CudaBufferPtr = *mut c_void;
+
+pub type Size = Size2D<u32>;
 
 pub struct RegisteredTexture {
     /// Invariant: `graphics_resource` is a valid and initialized FFI handle.
@@ -61,9 +62,12 @@ impl TextureRegistry {
                 let texture = occupied.into_mut();
                 if size != texture.size {
                     bail!(
-                        "Texture id {texture_id} already registered with size {}, requesting it \
-                         again with different size {size} is not supported.",
-                        texture.size,
+                        "Texture id {texture_id} already registered with size {}x{}, requesting it \
+                         again with different size {}x{} is not supported.",
+                        texture.size.width,
+                        texture.size.height,
+                        size.width,
+                        size.height,
                     );
                 }
                 if texture.usage != usage {
@@ -304,10 +308,15 @@ impl TextureSender {
         size: Size,
         cuda_slice: CudaSliceMut<'_>,
     ) -> Result<()> {
-        if size != cuda_slice.size() {
+        let slice_size = cuda_slice.size();
+
+        if size != slice_size {
             bail!(
-                "Passed size {size} differs from cuda_slice size {}.",
-                cuda_slice.size()
+                "Passed size {}x{} differs from cuda_slice size {}x{}.",
+                size.width,
+                size.height,
+                slice_size.width,
+                slice_size.height,
             );
         }
 
@@ -450,10 +459,15 @@ impl TextureReceiver {
         texture_id: u32,
         size: Size,
     ) -> Result<()> {
-        if size != cuda_slice.size() {
+        let slice_size = cuda_slice.size();
+
+        if size != slice_size {
             bail!(
-                "Passed size {size} differs from cuda_slice size {}.",
-                cuda_slice.size()
+                "Passed size {}x{} differs from cuda_slice size {}x{}.",
+                size.width,
+                size.height,
+                slice_size.width,
+                slice_size.height,
             );
         }
 
@@ -542,22 +556,4 @@ extern "C" {
         target: u32,
         flags: u32,
     ) -> cudart::cudaError_t;
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Size {
-    pub width: u32,
-    pub height: u32,
-}
-
-impl Size {
-    pub fn num_pixels(self) -> usize {
-        self.width as usize * self.height as usize
-    }
-}
-
-impl fmt::Display for Size {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}x{}", self.width, self.height)
-    }
 }
