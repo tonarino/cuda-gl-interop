@@ -52,9 +52,10 @@ impl TextureRegistry {
     pub fn get_or_insert_registered_texture(
         &mut self,
         texture_id: u32,
-        size: Size,
+        size: impl Into<Size>,
         usage: TextureUsage,
     ) -> Result<&mut RegisteredTexture> {
+        let size = size.into();
         let entry = self.texture_map.entry(texture_id);
 
         let vacant_entry = match entry {
@@ -132,7 +133,9 @@ unsafe impl Send for CudaBuffer {}
 
 impl CudaBuffer {
     /// Allocates a GPU device buffer for an RGBA8 texture with pixel size `width`, `height`.
-    pub fn new(size: Size) -> Result<Self> {
+    pub fn new(size: impl Into<Size>) -> Result<Self> {
+        let size = size.into();
+
         let mut pitch = 0;
 
         // SAFETY: thanks to MaybeUninit and error handling, we only use the out-pointer and `pitch`
@@ -207,11 +210,11 @@ impl<'a> CudaSlice<'a> {
     ///
     /// The input data must represent a valid CUDA buffer, such as the one obtained
     /// with `CudaBuffer::new()`, and it must remain valid for the lifetime of `'a`.
-    pub unsafe fn new(buffer: CudaBufferPtr, pitch: usize, size: Size) -> Self {
+    pub unsafe fn new(buffer: CudaBufferPtr, pitch: usize, size: impl Into<Size>) -> Self {
         Self {
             buffer,
             pitch,
-            size,
+            size: size.into(),
             _phantom_data: PhantomData,
         }
     }
@@ -234,11 +237,11 @@ impl<'a> CudaSliceMut<'a> {
     ///
     /// The input data must represent a valid CUDA buffer, such as the one obtained
     /// with `CudaBuffer::new()`, and it must remain valid for the lifetime of `'a`.
-    pub unsafe fn new(buffer: CudaBufferPtr, pitch: usize, size: Size) -> Self {
+    pub unsafe fn new(buffer: CudaBufferPtr, pitch: usize, size: impl Into<Size>) -> Self {
         Self {
             buffer,
             pitch,
-            size,
+            size: size.into(),
             _phantom_data: PhantomData,
         }
     }
@@ -282,7 +285,7 @@ impl TextureSender {
     pub fn copy_texture_to_cuda_buffer(
         &mut self,
         texture_id: u32,
-        size: Size,
+        size: impl Into<Size>,
         cuda_buffer: &mut CudaBuffer,
     ) -> Result<()> {
         self.copy_texture_to_cuda_slice(texture_id, size, cuda_buffer.as_slice_mut())
@@ -302,9 +305,10 @@ impl TextureSender {
     pub fn copy_texture_to_cuda_slice(
         &mut self,
         texture_id: u32,
-        size: Size,
+        size: impl Into<Size>,
         cuda_slice: CudaSliceMut<'_>,
     ) -> Result<()> {
+        let size = size.into();
         let slice_size = cuda_slice.size();
 
         if size != slice_size {
@@ -428,7 +432,7 @@ impl TextureReceiver {
         &mut self,
         cuda_buffer: &CudaBuffer,
         texture_id: u32,
-        size: Size,
+        size: impl Into<Size>,
     ) -> Result<()> {
         self.copy_cuda_slice_to_texture(cuda_buffer.as_slice(), texture_id, size)
     }
@@ -448,8 +452,9 @@ impl TextureReceiver {
         &mut self,
         cuda_slice: CudaSlice<'_>,
         texture_id: u32,
-        size: Size,
+        size: impl Into<Size>,
     ) -> Result<()> {
+        let size = size.into();
         let slice_size = cuda_slice.size();
 
         if size != slice_size {
