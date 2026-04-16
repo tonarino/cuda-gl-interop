@@ -9,15 +9,11 @@ use std::borrow::Cow;
 use winit::event_loop::EventLoop;
 
 fn main() -> Result<()> {
-    let size = Size {
-        width: 640,
-        height: 480,
-    };
-
+    let size = Size::new(640, 480);
     let event_loop = EventLoop::builder().build().unwrap();
     let (_window, display) = SimpleWindowBuilder::new().build(&event_loop);
 
-    let original_texture_data = vec![128u8; size.num_pixels() * 4];
+    let original_texture_data = vec![128u8; size.area() as usize * 4];
     let original_texture = create_texture(&display, &original_texture_data, size)?;
 
     let mut cuda_buffer = CudaBuffer::new(size)?;
@@ -29,7 +25,7 @@ fn main() -> Result<()> {
         &mut cuda_buffer,
     )?;
 
-    let black_texture_data = vec![0u8; size.num_pixels() * 4];
+    let black_texture_data = vec![0u8; size.area() as usize * 4];
     let copied_texture = create_texture(&display, &black_texture_data, size).unwrap();
 
     let mut texture_receiver = TextureReceiver::new();

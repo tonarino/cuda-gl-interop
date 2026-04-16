@@ -9,7 +9,7 @@ Crate for copying memory between CUDA buffers and OpenGL textures.
 ```rust
     let mut receiver = TextureReceiver::new();
 
-    let size = Size { width: 640, height: 480 };
+    let size = Size::new(640, 480);
     let buffer = CudaBuffer::new(size).expect("CUDA buffer can be allocated");
     // ...fill the buffer with data.
 
@@ -29,7 +29,7 @@ Crate for copying memory between CUDA buffers and OpenGL textures.
     let texture_id = 0;
     // ...create a 640x480 RGBA8 texture and fill it with data.
 
-    let size = Size { width: 640, height: 480 };
+    let size = Size::new(640, 480);
     let buffer = CudaBuffer::new(size).expect("CUDA buffer can be allocated");
 
     sender

@@ -1,13 +1,12 @@
 use anyhow::{anyhow, bail, Result};
 use cuda_sys::cudart;
+use euclid::default::Size2D;
 use std::{
     collections::{hash_map::Entry, HashMap},
     ffi::c_void,
-    fmt::{self},
     marker::PhantomData,
     mem::MaybeUninit,
 };
-//use tonari_math::Size;
 
 const CUDA_GRAPHICS_REGISTER_FLAGS_NONE: u32 = 0;
 const CUDA_GRAPHICS_REGISTER_FLAGS_READ_ONLY: u32 = 1;
@@ -18,6 +17,8 @@ const CUDA_MEMCPY_DEVICE_TO_DEVICE: u32 = 3;
 const BYTES_PER_RGBA8_PIXEL: usize = 4;
 
 type CudaBufferPtr = *mut c_void;
+
+pub type Size = Size2D<u32>;
 
 pub struct RegisteredTexture {
     /// Invariant: `graphics_resource` is a valid and initialized FFI handle.
@@ -51,9 +52,10 @@ impl TextureRegistry {
     pub fn get_or_insert_registered_texture(
         &mut self,
         texture_id: u32,
-        size: Size,
+        size: impl Into<Size>,
         usage: TextureUsage,
     ) -> Result<&mut RegisteredTexture> {
+        let size = size.into();
         let entry = self.texture_map.entry(texture_id);
 
         let vacant_entry = match entry {
@@ -61,8 +63,8 @@ impl TextureRegistry {
                 let texture = occupied.into_mut();
                 if size != texture.size {
                     bail!(
-                        "Texture id {texture_id} already registered with size {}, requesting it \
-                         again with different size {size} is not supported.",
+                        "Texture id {texture_id} already registered with size {:?}, requesting it \
+                         again with different size {size:?} is not supported.",
                         texture.size,
                     );
                 }
@@ -131,7 +133,9 @@ unsafe impl Send for CudaBuffer {}
 
 impl CudaBuffer {
     /// Allocates a GPU device buffer for an RGBA8 texture with pixel size `width`, `height`.
-    pub fn new(size: Size) -> Result<Self> {
+    pub fn new(size: impl Into<Size>) -> Result<Self> {
+        let size = size.into();
+
         let mut pitch = 0;
 
         // SAFETY: thanks to MaybeUninit and error handling, we only use the out-pointer and `pitch`
@@ -206,11 +210,11 @@ impl<'a> CudaSlice<'a> {
     ///
     /// The input data must represent a valid CUDA buffer, such as the one obtained
     /// with `CudaBuffer::new()`, and it must remain valid for the lifetime of `'a`.
-    pub unsafe fn new(buffer: CudaBufferPtr, pitch: usize, size: Size) -> Self {
+    pub unsafe fn new(buffer: CudaBufferPtr, pitch: usize, size: impl Into<Size>) -> Self {
         Self {
             buffer,
             pitch,
-            size,
+            size: size.into(),
             _phantom_data: PhantomData,
         }
     }
@@ -233,11 +237,11 @@ impl<'a> CudaSliceMut<'a> {
     ///
     /// The input data must represent a valid CUDA buffer, such as the one obtained
     /// with `CudaBuffer::new()`, and it must remain valid for the lifetime of `'a`.
-    pub unsafe fn new(buffer: CudaBufferPtr, pitch: usize, size: Size) -> Self {
+    pub unsafe fn new(buffer: CudaBufferPtr, pitch: usize, size: impl Into<Size>) -> Self {
         Self {
             buffer,
             pitch,
-            size,
+            size: size.into(),
             _phantom_data: PhantomData,
         }
     }
@@ -281,7 +285,7 @@ impl TextureSender {
     pub fn copy_texture_to_cuda_buffer(
         &mut self,
         texture_id: u32,
-        size: Size,
+        size: impl Into<Size>,
         cuda_buffer: &mut CudaBuffer,
     ) -> Result<()> {
         self.copy_texture_to_cuda_slice(texture_id, size, cuda_buffer.as_slice_mut())
@@ -301,14 +305,14 @@ impl TextureSender {
     pub fn copy_texture_to_cuda_slice(
         &mut self,
         texture_id: u32,
-        size: Size,
+        size: impl Into<Size>,
         cuda_slice: CudaSliceMut<'_>,
     ) -> Result<()> {
-        if size != cuda_slice.size() {
-            bail!(
-                "Passed size {size} differs from cuda_slice size {}.",
-                cuda_slice.size()
-            );
+        let size = size.into();
+        let slice_size = cuda_slice.size();
+
+        if size != slice_size {
+            bail!("Passed size {size:?} differs from cuda_slice size {slice_size:?}.");
         }
 
         let registered_texture = self.texture_registry.get_or_insert_registered_texture(
@@ -428,7 +432,7 @@ impl TextureReceiver {
         &mut self,
         cuda_buffer: &CudaBuffer,
         texture_id: u32,
-        size: Size,
+        size: impl Into<Size>,
     ) -> Result<()> {
         self.copy_cuda_slice_to_texture(cuda_buffer.as_slice(), texture_id, size)
     }
@@ -448,13 +452,13 @@ impl TextureReceiver {
         &mut self,
         cuda_slice: CudaSlice<'_>,
         texture_id: u32,
-        size: Size,
+        size: impl Into<Size>,
     ) -> Result<()> {
-        if size != cuda_slice.size() {
-            bail!(
-                "Passed size {size} differs from cuda_slice size {}.",
-                cuda_slice.size()
-            );
+        let size = size.into();
+        let slice_size = cuda_slice.size();
+
+        if size != slice_size {
+            bail!("Passed size {size:?} differs from cuda_slice size {slice_size:?}.");
         }
 
         let registered_texture = self.texture_registry.get_or_insert_registered_texture(
@@ -542,22 +546,4 @@ extern "C" {
         target: u32,
         flags: u32,
     ) -> cudart::cudaError_t;
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Size {
-    pub width: u32,
-    pub height: u32,
-}
-
-impl Size {
-    pub fn num_pixels(self) -> usize {
-        self.width as usize * self.height as usize
-    }
-}
-
-impl fmt::Display for Size {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}x{}", self.width, self.height)
-    }
 }
