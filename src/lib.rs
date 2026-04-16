@@ -62,12 +62,9 @@ impl TextureRegistry {
                 let texture = occupied.into_mut();
                 if size != texture.size {
                     bail!(
-                        "Texture id {texture_id} already registered with size {}x{}, requesting it \
-                         again with different size {}x{} is not supported.",
-                        texture.size.width,
-                        texture.size.height,
-                        size.width,
-                        size.height,
+                        "Texture id {texture_id} already registered with size {:?}, requesting it \
+                         again with different size {size:?} is not supported.",
+                        texture.size,
                     );
                 }
                 if texture.usage != usage {
@@ -311,13 +308,7 @@ impl TextureSender {
         let slice_size = cuda_slice.size();
 
         if size != slice_size {
-            bail!(
-                "Passed size {}x{} differs from cuda_slice size {}x{}.",
-                size.width,
-                size.height,
-                slice_size.width,
-                slice_size.height,
-            );
+            bail!("Passed size {size:?} differs from cuda_slice size {slice_size:?}.");
         }
 
         let registered_texture = self.texture_registry.get_or_insert_registered_texture(
@@ -462,13 +453,7 @@ impl TextureReceiver {
         let slice_size = cuda_slice.size();
 
         if size != slice_size {
-            bail!(
-                "Passed size {}x{} differs from cuda_slice size {}x{}.",
-                size.width,
-                size.height,
-                slice_size.width,
-                slice_size.height,
-            );
+            bail!("Passed size {size:?} differs from cuda_slice size {slice_size:?}.");
         }
 
         let registered_texture = self.texture_registry.get_or_insert_registered_texture(
