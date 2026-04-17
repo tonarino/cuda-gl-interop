@@ -12,7 +12,7 @@ keywords = ["cuda", "opengl"]
 
 [dependencies]
 anyhow = "1"
-cudarc = { version = "0.19", features = ["cuda-version-from-build-system"] }
+cudarc = { version = "0.19", features = ["cuda-version-from-build-system", "dynamic-linking"] }
 euclid = "0.22"
 gl = "0.14"
 
