@@ -1,5 +1,5 @@
 use anyhow::{anyhow, bail, Result};
-use cuda_sys::cudart;
+use cudarc::runtime::sys::{self as cudart, cudaMemcpyKind};
 use euclid::default::Size2D;
 use std::{
     collections::{hash_map::Entry, HashMap},
@@ -11,8 +11,6 @@ use std::{
 const CUDA_GRAPHICS_REGISTER_FLAGS_NONE: u32 = 0;
 const CUDA_GRAPHICS_REGISTER_FLAGS_READ_ONLY: u32 = 1;
 const CUDA_GRAPHICS_REGISTER_FLAGS_WRITE_DISCARD: u32 = 2;
-
-const CUDA_MEMCPY_DEVICE_TO_DEVICE: u32 = 3;
 
 const BYTES_PER_RGBA8_PIXEL: usize = 4;
 
@@ -378,7 +376,7 @@ impl TextureSender {
                 0,                                           // height offset
                 size.width as usize * BYTES_PER_RGBA8_PIXEL, // width in bytes
                 size.height as usize,                        // height in rows
-                CUDA_MEMCPY_DEVICE_TO_DEVICE,                // memcpy kind
+                cudaMemcpyKind::cudaMemcpyDeviceToDevice,    // memcpy kind
             )
             .to_result()?;
         }
@@ -506,7 +504,7 @@ impl TextureReceiver {
                 cuda_slice.pitch,                            // src pitch
                 size.width as usize * BYTES_PER_RGBA8_PIXEL, // width in bytes
                 size.height as usize,                        // height in rows
-                CUDA_MEMCPY_DEVICE_TO_DEVICE,                // memcpy kind
+                cudaMemcpyKind::cudaMemcpyDeviceToDevice,    // memcpy kind
             )
             .to_result()?;
         }
@@ -533,7 +531,7 @@ trait CudaErrorTExt {
 impl CudaErrorTExt for cudart::cudaError_t {
     fn to_result(self) -> Result<()> {
         match self {
-            cudart::cudaError_t::Success => Ok(()),
+            cudart::cudaError_t::cudaSuccess => Ok(()),
             other => Err(anyhow!("Got CUDA error {other:?}")),
         }
     }
