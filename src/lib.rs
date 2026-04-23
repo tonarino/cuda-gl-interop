@@ -217,6 +217,14 @@ impl<'a> CudaSlice<'a> {
         }
     }
 
+    pub fn buffer(&self) -> *mut c_void {
+        self.buffer
+    }
+
+    pub fn pitch(&self) -> usize {
+        self.pitch
+    }
+
     pub fn size(&self) -> Size {
         self.size
     }
@@ -242,6 +250,14 @@ impl<'a> CudaSliceMut<'a> {
             size: size.into(),
             _phantom_data: PhantomData,
         }
+    }
+
+    pub fn buffer(&self) -> *mut c_void {
+        self.buffer
+    }
+
+    pub fn pitch(&self) -> usize {
+        self.pitch
     }
 
     pub fn size(&self) -> Size {
