@@ -14,8 +14,6 @@ const CUDA_GRAPHICS_REGISTER_FLAGS_WRITE_DISCARD: u32 = 2;
 
 const BYTES_PER_RGBA8_PIXEL: usize = 4;
 
-type CudaBufferPtr = *mut c_void;
-
 pub type Size = Size2D<u32>;
 
 pub struct RegisteredTexture {
@@ -120,7 +118,7 @@ pub enum TextureUsage {
 #[derive(Debug)]
 pub struct CudaBuffer {
     /// Invariant: `buffer` is a valid device pointer allocated using `cudaMalloc*()` method.
-    buffer: CudaBufferPtr,
+    buffer: *mut c_void,
     pitch: usize,
     size: Size,
 }
@@ -139,7 +137,7 @@ impl CudaBuffer {
         // SAFETY: thanks to MaybeUninit and error handling, we only use the out-pointer and `pitch`
         // if the FFI method has succeeded.
         let buffer = unsafe {
-            let mut buffer_uninit = MaybeUninit::<CudaBufferPtr>::uninit();
+            let mut buffer_uninit = MaybeUninit::<*mut c_void>::uninit();
 
             cudart::cudaMallocPitch(
                 buffer_uninit.as_mut_ptr(),
@@ -169,7 +167,11 @@ impl CudaBuffer {
         unsafe { CudaSliceMut::new(self.buffer, self.pitch, self.size) }
     }
 
-    pub fn ptr(&self) -> CudaBufferPtr {
+    pub fn as_ptr(&self) -> *const c_void {
+        self.buffer
+    }
+
+    pub fn as_ptr_mut(&self) -> *mut c_void {
         self.buffer
     }
 
@@ -197,7 +199,7 @@ impl Drop for CudaBuffer {
 
 /// A slice of a CUDA device buffer.
 pub struct CudaSlice<'a> {
-    buffer: CudaBufferPtr,
+    buffer: *const c_void,
     pitch: usize,
     size: Size,
     _phantom_data: PhantomData<&'a CudaBuffer>,
@@ -208,7 +210,7 @@ impl<'a> CudaSlice<'a> {
     ///
     /// The input data must represent a valid CUDA buffer, such as the one obtained
     /// with `CudaBuffer::new()`, and it must remain valid for the lifetime of `'a`.
-    pub unsafe fn new(buffer: CudaBufferPtr, pitch: usize, size: impl Into<Size>) -> Self {
+    pub unsafe fn new(buffer: *const c_void, pitch: usize, size: impl Into<Size>) -> Self {
         Self {
             buffer,
             pitch,
@@ -217,7 +219,7 @@ impl<'a> CudaSlice<'a> {
         }
     }
 
-    pub fn buffer(&self) -> *mut c_void {
+    pub fn as_ptr(&self) -> *const c_void {
         self.buffer
     }
 
@@ -232,7 +234,7 @@ impl<'a> CudaSlice<'a> {
 
 /// A slice of a CUDA device buffer.
 pub struct CudaSliceMut<'a> {
-    buffer: CudaBufferPtr,
+    buffer: *mut c_void,
     pitch: usize,
     size: Size,
     _phantom_data: PhantomData<&'a mut CudaBuffer>,
@@ -243,7 +245,7 @@ impl<'a> CudaSliceMut<'a> {
     ///
     /// The input data must represent a valid CUDA buffer, such as the one obtained
     /// with `CudaBuffer::new()`, and it must remain valid for the lifetime of `'a`.
-    pub unsafe fn new(buffer: CudaBufferPtr, pitch: usize, size: impl Into<Size>) -> Self {
+    pub unsafe fn new(buffer: *mut c_void, pitch: usize, size: impl Into<Size>) -> Self {
         Self {
             buffer,
             pitch,
@@ -252,7 +254,11 @@ impl<'a> CudaSliceMut<'a> {
         }
     }
 
-    pub fn buffer(&self) -> *mut c_void {
+    pub fn as_ptr(&self) -> *const c_void {
+        self.buffer
+    }
+
+    pub fn as_ptr_mut(&self) -> *mut c_void {
         self.buffer
     }
 
