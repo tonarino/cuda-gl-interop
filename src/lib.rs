@@ -162,7 +162,7 @@ impl CudaBuffer {
         unsafe { CudaSlice::new(self.buffer, self.pitch, self.size) }
     }
 
-    pub fn as_slice_mut<'a>(&'a mut self) -> CudaSliceMut<'a> {
+    pub fn as_mut_slice<'a>(&'a mut self) -> CudaSliceMut<'a> {
         // SAFETY: `self` is a CUDA device buffer valid for lifetime `'a`.
         unsafe { CudaSliceMut::new(self.buffer, self.pitch, self.size) }
     }
@@ -171,7 +171,7 @@ impl CudaBuffer {
         self.buffer
     }
 
-    pub fn as_ptr_mut(&self) -> *mut c_void {
+    pub fn as_mut_ptr(&self) -> *mut c_void {
         self.buffer
     }
 
@@ -258,7 +258,7 @@ impl<'a> CudaSliceMut<'a> {
         self.buffer
     }
 
-    pub fn as_ptr_mut(&self) -> *mut c_void {
+    pub fn as_mut_ptr(&self) -> *mut c_void {
         self.buffer
     }
 
@@ -308,7 +308,7 @@ impl TextureSender {
         size: impl Into<Size>,
         cuda_buffer: &mut CudaBuffer,
     ) -> Result<()> {
-        self.copy_texture_to_cuda_slice(texture_id, size, cuda_buffer.as_slice_mut())
+        self.copy_texture_to_cuda_slice(texture_id, size, cuda_buffer.as_mut_slice())
     }
 
     /// Copies an OpenGL texture, which must be in RGBA8 format, to a CUDA slice.
